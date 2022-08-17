@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import MapboxDraw from '@mapbox/mapbox-gl-draw'
+import * as Turf from '@turf/turf';
+
 import { ExportToCsv } from 'export-to-csv';
 
 import { IMapFeature } from './IMapFeature';
@@ -8,6 +10,7 @@ import MapFeatures from './MapFeatures';
 
 mapboxgl.accessToken = 'pk.eyJ1IjoiYWxpY2tzIiwiYSI6ImNsNnhhdHVtMTA3N20zZHAxZ2M3MXp0YjcifQ.jsmP4xv9toaq6WSGxTTJDg';
 
+export type FeatureChangeHandler = (id: string, key: string, value: string) => void;
 
 export default function Map() {
   const csvExporter = new ExportToCsv({ useKeysAsHeaders: true });
@@ -40,12 +43,13 @@ export default function Map() {
     map.current.on('draw.selectionchange', handleMapDrawSelectionChange);
     map.current.on('draw.create', handleMapDrawCreate);
     map.current.on('draw.delete', handleMapDrawDelete);
-    // map.current.on('draw.update', handleMapDrawWrite);
+    map.current.on('draw.update', handleMapUpdate);
 
 
     map.current.addControl(draw.current);
   });
 
+  // Custom methods
   function updateMapFeatureById(id: string, update: Partial<IMapFeature>, reset: Partial<IMapFeature> = {}) {
     setMapFeatures((mapFeatures) => {
       return mapFeatures.map(mapFeature => {
@@ -58,6 +62,7 @@ export default function Map() {
     });
   }
 
+  // Map Event Handlers
   function handleMapDrawSelectionChange(e: MapboxDraw.DrawSelectionChangeEvent) {
     setMapFeatures((mapFeatures) => {
       return mapFeatures.map(mapFeature => {
@@ -67,12 +72,23 @@ export default function Map() {
   }
 
   function handleMapDrawCreate(e: MapboxDraw.DrawCreateEvent) {
+    const newFeature = e.features[e.features.length - 1];
+
     const newMapFeature = {
+      area: Turf.area(newFeature.geometry),
       name: 'field_' + Math.floor(Math.random() * 10000),
       selected: true,
-      ...e.features[e.features.length - 1]
+      ...newFeature
     };
     setMapFeatures((mapFeatures) => [ ...mapFeatures, newMapFeature ]);
+  }
+
+  function handleMapUpdate(e: MapboxDraw.DrawUpdateEvent) {
+    e.features.forEach((feature) => {
+      const area = Turf.area(feature.geometry);
+
+      updateMapFeatureById(feature.id, { area });
+    });
   }
 
   function handleMapDrawDelete(e: MapboxDraw.DrawDeleteEvent) {
@@ -86,14 +102,14 @@ export default function Map() {
     });
   }
 
-  function handleFeatureNameChange(id: string, name: string) {
-    updateMapFeatureById(id, { name })
+  // UI Event Handlers
+  function handleFeatureChange(id: string, key: keyof IMapFeature, value: string) {
+    const update = { [key]: value }
+    updateMapFeatureById(id, update);
   }
 
   function handleFeatureSelect(id: string) {
     updateMapFeatureById(id, { selected: true }, { selected: false });
-
-    console.log('select: ', id);
     draw.current.changeMode('simple_select', { featureIds: [id] });
   }
 
@@ -106,9 +122,9 @@ export default function Map() {
     e.preventDefault();
 
     const mapFeaturesData = mapFeatures.map((mapFeature) => {
-      const { name, geometry: { coordinates } } = mapFeature;
+      const { name, contents, geometry: { coordinates } } = mapFeature;
 
-      return { name, coordinates };
+      return { name, contents, coordinates };
     })
 
     csvExporter.generateCsv(mapFeaturesData);
@@ -121,11 +137,14 @@ export default function Map() {
       <button onClick={handleSaveClick}>Save</button>
       <button onClick={handleDownloadCSVClick}>Download CSV</button>
 
-      <MapFeatures
-        features={mapFeatures}
-        onFeatureSelect={handleFeatureSelect}
-        onFeatureNameChange={handleFeatureNameChange}
-      />
+      { !mapFeatures.length
+        ? <p>Please add a field to the map</p>
+        : <MapFeatures
+            features={ mapFeatures }
+            onFeatureSelect={ handleFeatureSelect }
+            onFeatureChange={ handleFeatureChange }
+          />
+      }
     </div>
   );
 }
