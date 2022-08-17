@@ -116,15 +116,16 @@ export default function Map() {
   function handleSaveClick(e) {
     // @TODO - Add API Integration
     debugger;
+    console.log('Call API', mapFeatures);
   }
 
   function handleDownloadCSVClick(e) {
     e.preventDefault();
 
     const mapFeaturesData = mapFeatures.map((mapFeature) => {
-      const { name, contents, geometry: { coordinates } } = mapFeature;
+      const { name, contents, area, geometry: { coordinates } } = mapFeature;
 
-      return { name, contents, coordinates };
+      return { name, contents, area, coordinates };
     })
 
     csvExporter.generateCsv(mapFeaturesData);
