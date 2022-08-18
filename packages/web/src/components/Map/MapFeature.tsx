@@ -1,5 +1,6 @@
 import React from 'react';
 import classNames from 'classnames';
+import { m2ToAcres } from '../../utils/math';
 
 import { IMapFeature } from './IMapFeature';
 import { FeatureChangeHandler } from './Map';
@@ -53,7 +54,7 @@ export default function MapFeature({ feature, onFeatureSelect, onFeatureChange }
         </select>
       </td>
 
-      <td>{feature.area.toFixed(2)} m2</td>
+      <td>{feature.area.toFixed(2)} m2 ({ m2ToAcres(feature.area)} Acres)</td>
     </tr>
   )
 }
